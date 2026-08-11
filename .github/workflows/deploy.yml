@@ -1,0 +1,46 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        # See .github/workflows/ci.yml for why --legacy-peer-deps is needed.
+        run: npm ci --legacy-peer-deps
+
+      - name: Build
+        run: npm run build
+        env:
+          # See .github/workflows/ci.yml for why this is required (webpack 4
+          # + terser-webpack-plugin vs. Node's OpenSSL 3 default).
+          NODE_OPTIONS: --openssl-legacy-provider
+
+      - name: Deploy to gh-pages
+        # Pinned to a commit SHA (not the mutable v3 tag) for supply-chain
+        # safety, since this step runs with contents: write and pushes to
+        # the repo. SHA corresponds to tag v3.9.3.
+        uses: peaceiris/actions-gh-pages@373f7f263a76c20808c831209c920827a82a2847 # v3.9.3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist

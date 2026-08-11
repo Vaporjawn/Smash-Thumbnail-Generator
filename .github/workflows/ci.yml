@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        # package-lock.json has an unresolved peer-dependency conflict
+        # (@vue/composition-api requires vue <2.7, but vue resolves to
+        # 2.7.16) that npm's strict ERESOLVE algorithm (npm 7+) rejects.
+        # --legacy-peer-deps restores the npm 6-era resolution the lockfile
+        # was originally generated under.
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check for test:unit script
+        id: check-test
+        run: |
+          if jq -e '.scripts["test:unit"] != null' package.json > /dev/null; then
+            echo "has_test=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_test=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run unit tests
+        if: steps.check-test.outputs.has_test == 'true'
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+        env:
+          # vue-cli 4 pulls in webpack 4 + terser-webpack-plugin, which call
+          # Node's crypto hash routines in a way OpenSSL 3 (default since
+          # Node 17) rejects with "digital envelope routines::unsupported".
+          # Re-enable the legacy provider until the build toolchain is
+          # upgraded past webpack 4.
+          NODE_OPTIONS: --openssl-legacy-provider
