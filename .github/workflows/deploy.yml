@@ -26,7 +26,8 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # See .github/workflows/ci.yml for why --legacy-peer-deps is needed.
+        run: npm ci --legacy-peer-deps
 
       - name: Build
         run: npm run build

@@ -21,7 +21,12 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # package-lock.json has an unresolved peer-dependency conflict
+        # (@vue/composition-api requires vue <2.7, but vue resolves to
+        # 2.7.16) that npm's strict ERESOLVE algorithm (npm 7+) rejects.
+        # --legacy-peer-deps restores the npm 6-era resolution the lockfile
+        # was originally generated under.
+        run: npm ci --legacy-peer-deps
 
       - name: Lint
         run: npm run lint
