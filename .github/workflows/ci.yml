@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check for test:unit script
+        id: check-test
+        run: |
+          if jq -e '.scripts["test:unit"] != null' package.json > /dev/null; then
+            echo "has_test=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_test=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run unit tests
+        if: steps.check-test.outputs.has_test == 'true'
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+        env:
+          # vue-cli 4 pulls in webpack 4 + terser-webpack-plugin, which call
+          # Node's crypto hash routines in a way OpenSSL 3 (default since
+          # Node 17) rejects with "digital envelope routines::unsupported".
+          # Re-enable the legacy provider until the build toolchain is
+          # upgraded past webpack 4.
+          NODE_OPTIONS: --openssl-legacy-provider
